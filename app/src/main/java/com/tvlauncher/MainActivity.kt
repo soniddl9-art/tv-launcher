@@ -2,10 +2,12 @@ package com.tvlauncher
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,7 +46,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 // Change this to your city for the weather card.
-private const val CITY = "Delhi"
+private const val CITY = "Bhopal"
 
 // Apps in this list are only HIDDEN from this launcher. Nothing is uninstalled.
 private val HIDDEN = setOf(
@@ -117,6 +119,33 @@ class MainActivity : ComponentActivity() {
         if (i != null) startActivity(i)
     }
 
+    private fun openAssistant() {
+        val tries = listOf(Intent(Intent.ACTION_ASSIST), Intent(Intent.ACTION_VOICE_COMMAND))
+        for (i in tries) {
+            try {
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(i)
+                return
+            } catch (e: Exception) { }
+        }
+        Toast.makeText(this, "Voice assistant not found", Toast.LENGTH_SHORT).show()
+    }
+
+    @Composable
+    fun GlassButton(text: String, onClick: () -> Unit) {
+        var f by remember { mutableStateOf(false) }
+        val shape = RoundedCornerShape(16.dp)
+        Box(
+            Modifier
+                .onFocusChanged { f = it.isFocused }
+                .clip(shape)
+                .background(if (f) Color(0x40FFFFFF) else Color(0x1AFFFFFF))
+                .border(if (f) 3.dp else 1.dp, if (f) Color.White else Color(0x40FFFFFF), shape)
+                .clickable { onClick() }
+                .padding(horizontal = 18.dp, vertical = 12.dp)
+        ) { BasicText(text, style = TextStyle(Color.White, 16.sp)) }
+    }
+
     @Composable
     fun Glass(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
         val shape = RoundedCornerShape(28.dp)
@@ -125,7 +154,7 @@ class MainActivity : ComponentActivity() {
                 .clip(shape)
                 .background(Color(0x26FFFFFF))
                 .border(1.dp, Color(0x40FFFFFF), shape)
-                .padding(28.dp),
+                .padding(22.dp),
             content = content
         )
     }
@@ -136,6 +165,14 @@ class MainActivity : ComponentActivity() {
         var focused by remember { mutableStateOf(0) }
         var now by remember { mutableStateOf(Date()) }
         var weather by remember { mutableStateOf<Weather?>(null) }
+        val prefs = remember { getSharedPreferences("prefs", MODE_PRIVATE) }
+        var wpIndex by remember {
+            mutableStateOf(prefs.getInt("wp", 0).coerceIn(0, WALLPAPERS.lastIndex))
+        }
+        val wp = WALLPAPERS[wpIndex]
+        val c0 by animateColorAsState(Color(wp.top), tween(800), label = "c0")
+        val c1 by animateColorAsState(Color(wp.mid), tween(800), label = "c1")
+        val c2 by animateColorAsState(Color(wp.bottom), tween(800), label = "c2")
 
         LaunchedEffect(Unit) { apps = withContext(Dispatchers.IO) { loadApps() } }
         LaunchedEffect(Unit) { while (true) { now = Date(); delay(15_000) } }
@@ -161,7 +198,7 @@ class MainActivity : ComponentActivity() {
 
         Box(
             Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color(0xFF16293A), Color(0xFF0B141D), Color(0xFF05080C)))
+                Brush.verticalGradient(listOf(c0, c1, c2))
             )
         ) {
             Box(
@@ -178,22 +215,22 @@ class MainActivity : ComponentActivity() {
                         BasicText(greeting, style = TextStyle(Color(0xB3FFFFFF), 20.sp))
                         Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.Bottom) {
-                            BasicText(timeText, style = TextStyle(Color.White, 88.sp, FontWeight.Bold))
+                            BasicText(timeText, style = TextStyle(Color.White, 60.sp, FontWeight.Bold))
                             Spacer(Modifier.width(10.dp))
                             BasicText(
                                 ampm,
-                                Modifier.padding(bottom = 16.dp),
-                                style = TextStyle(Color(0xB3FFFFFF), 28.sp)
+                                Modifier.padding(bottom = 10.dp),
+                                style = TextStyle(Color(0xB3FFFFFF), 22.sp)
                             )
                         }
                         BasicText(dateText, style = TextStyle(Color(0xCCFFFFFF), 22.sp))
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(8.dp))
                         Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x40FFFFFF)))
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(8.dp))
                         val w = weather
                         if (w != null) {
-                            BasicText("${w.temp}°", style = TextStyle(Color.White, 40.sp, FontWeight.Bold))
-                            BasicText("${w.text} · ${w.city}", style = TextStyle(Color(0xB3FFFFFF), 20.sp))
+                            BasicText("${w.temp}°", style = TextStyle(Color.White, 32.sp, FontWeight.Bold))
+                            BasicText("${w.text} · ${w.city}", style = TextStyle(Color(0xB3FFFFFF), 18.sp))
                         } else {
                             BasicText("Weather loading…", style = TextStyle(Color(0x99FFFFFF), 20.sp))
                         }
@@ -217,6 +254,14 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             }
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            GlassButton("Wallpaper") {
+                                wpIndex = (wpIndex + 1) % WALLPAPERS.size
+                                prefs.edit().putInt("wp", wpIndex).apply()
+                            }
+                            GlassButton("Assistant") { openAssistant() }
                         }
                     }
                 }
